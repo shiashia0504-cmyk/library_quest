@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>도서관 탐험대 - KDC 보드게임</title>
+<style>
+  :root{
+    --bg: #FDF3F0;
+    --paper: #FFFCFA;
+    --ink: #4A3B3E;
+    --ink-soft: #8A7478;
+    --accent: #E88BA1;
+    --accent-deep: #C9647E;
+    --line: #F0D9DE;
+
+    --z0:#A79FD9; --z1:#C08AE0; --z2:#F080B0; --z3:#F07272; --z4:#F5A94D;
+    --z5:#F0CE3E; --z6:#63C24F; --z7:#2EC4A6; --z8:#4DA8EA; --z9:#7A82E0;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; padding:0; height:100%; }
+  body{
+    background:
+      radial-gradient(circle at 12% 8%, #FCE4E9 0%, transparent 45%),
+      radial-gradient(circle at 88% 92%, #E9E6FB 0%, transparent 45%),
+      var(--bg);
+    font-family: "Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    color: var(--ink);
+  }
+  h1,h2,h3{ font-weight:800; letter-spacing:-0.02em; margin:0; }
+  button{ font-family:inherit; cursor:pointer; border:none; }
+  input{ font-family:inherit; }
+  .hidden{ display:none !important; }
+
+  .card{
+    background: var(--paper);
+    border-radius: 24px;
+    box-shadow: 0 18px 40px -18px rgba(180,120,140,0.35), 0 2px 0 rgba(255,255,255,0.6) inset;
+    border: 1.5px solid var(--line);
+  }
+
+  /* ---------- 셋업 화면 (스크롤 허용) ---------- */
+  #setup-screen{ min-height:100vh; display:flex; flex-direction:column; align-items:center; padding: 28px 20px 50px; }
+  .eyebrow{ font-size: 13px; font-weight:700; color: var(--accent-deep); letter-spacing: 0.14em; text-transform:uppercase; margin-bottom: 6px; }
+  .title-main{ font-size: 32px; margin-bottom: 4px; }
+  .subtitle{ color: var(--ink-soft); font-size: 15px; margin-bottom: 24px; text-align:center; }
+  #setup-card{ width: min(600px, 92vw); padding: 32px 30px 28px; }
+  .field{ margin-bottom: 22px; }
+  .field label{ display:block; font-size:14px; font-weight:700; color:var(--ink); margin-bottom:10px; }
+  .stepper{ display:flex; align-items:center; gap:14px; }
+  .stepper button{ width:44px; height:44px; border-radius:14px; background:var(--z2); color:#7A3B54; font-size:20px; font-weight:800; }
+  .stepper button:active{ transform: scale(0.92); }
+  .stepper .count{ width:64px; text-align:center; font-size:26px; font-weight:800; color:var(--accent-deep); }
+
+  .toggle-row{ display:flex; gap:10px; }
+  .toggle-opt{ flex:1; padding:14px 8px; border-radius:16px; background:#F6EEEE; border: 2px solid transparent; text-align:center; font-weight:700; font-size:13.5px; color: var(--ink-soft); transition: all .15s ease; }
+  .toggle-opt.active{ background: #FBE4EA; border-color: var(--accent); color: var(--accent-deep); }
+  .toggle-opt small{ display:block; font-weight:600; font-size:11px; margin-top:3px; opacity:0.8;}
+
+  .team-name-list{ display:flex; flex-direction:column; gap:8px; }
+  .team-name-row{ display:flex; align-items:center; gap:10px; position:relative; }
+  .emoji-popover{
+    position:absolute; top:48px; right:0; z-index:30; background:#fff; border-radius:16px; padding:12px;
+    box-shadow:0 16px 34px -12px rgba(90,50,70,0.35); border:1.5px solid var(--line); width:236px;
+  }
+  .emoji-popover .none-opt{
+    width:100%; padding:9px; border-radius:10px; background:#F6EEEE; font-size:12.5px; font-weight:700;
+    color:var(--ink-soft); margin-bottom:8px;
+  }
+  .emoji-popover .emoji-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .emoji-popover .emoji-grid button{
+    width:40px; height:40px; border-radius:11px; background:#F6EEEE; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .emoji-popover .emoji-grid button:hover{ background:#FBE4EA; }
+  .team-dot{ width:16px; height:16px; border-radius:6px; flex-shrink:0; }
+  .team-name-row input{
+    flex:1; padding:10px 12px; border-radius:12px; border:1.5px solid var(--line); background:#fff;
+    font-size:14px; font-weight:600; color:var(--ink);
+  }
+  .team-name-row input:focus{ outline:none; border-color:var(--accent); }
+  .emoji-pick-btn{
+    width:42px; height:42px; border-radius:12px; background:#F6EEEE; font-size:19px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color:var(--ink-soft); transition: background .15s ease;
+  }
+  .emoji-pick-btn.picked{ background:#FBE4EA; }
+
+  .start-btn{ width:100%; margin-top: 6px; padding:16px; border-radius:18px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color:#fff; font-size:17px; font-weight:800; box-shadow: 0 12px 24px -10px rgba(201,100,126,0.55); }
+
+  /* ---------- 게임 화면 (한 화면 고정, 스크롤 없음) ---------- */
+  #game-screen{ height:100vh; width:100vw; overflow:hidden; display:flex; flex-direction:column; align-items:center; padding: 14px 16px 10px; }
+  .game-top{ display:flex; justify-content:space-between; align-items:center; width:100%; max-width:1300px; margin-bottom:10px; }
+  .game-top h2{ font-size:18px; }
+  .game-top .eyebrow{ margin-bottom:2px; }
+  .reset-link{ font-size:12.5px; color:var(--ink-soft); text-decoration:underline; background:none; }
+
+  #board-outer{ flex:1; display:flex; align-items:center; justify-content:center; width:100%; overflow:hidden; }
+  #board{ display:grid; position:relative; }
+
+  .tile{
+    position:relative; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding-top: 4px; font-size:10px; font-weight:800; color:#fff;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35), 0 3px 7px rgba(40,25,35,0.22);
+  }
+  .tile.corner{ border-radius:18px; }
+  .tile .tile-tag{ font-size:9px; opacity:0.85; font-weight:800; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+  .tile .tile-label{ font-size: 10.5px; text-align:center; line-height:1.25; padding:0 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .tile.mission .tile-mark::after{ content:"✦"; }
+  .tile.event .tile-mark::after{ content:"◆"; }
+  .tile.warp .tile-mark::after{ content:"🌀"; }
+  .tile-mark{ position:absolute; top:4px; right:5px; font-size:13px; color:#fff; text-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+  .tile.start .tile-label, .tile.finish .tile-label{ font-weight:800; font-size:11.5px; }
+  .tile.mission, .tile.event, .tile.warp{ box-shadow: inset 0 0 0 3px rgba(255,255,255,0.75), 0 3px 7px rgba(40,25,35,0.25); }
+
+  .tile-tokens{ position:absolute; bottom:-4px; left:0; right:0; display:flex; gap:3px; flex-wrap:wrap; justify-content:center; padding:0 2px; z-index:5;}
+  .chip{
+    width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:800; color:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.3); flex-shrink:0;
+    border:2px solid #fff; animation: pop-in 0.28s ease;
+  }
+  .chip.current-turn{ animation: pulse 0.9s infinite; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent-deep); }
+  @keyframes pulse{ 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.16);} }
+  @keyframes pop-in{ 0%{ transform: scale(0);} 60%{ transform: scale(1.25);} 100%{ transform: scale(1);} }
+  .chip.chip-md{ width:22px; height:22px; font-size:11px; }
+  .chip.chip-sm{ width:18px; height:18px; font-size:9px; border-width:1.5px; }
+  .chip.chip-xs{ width:15px; height:15px; font-size:8px; border-width:1px; }
+
+  /* ---------- 중앙 패널 ---------- */
+  #center-panel{
+    background: var(--paper); border-radius: 22px; border:2px solid var(--line);
+    box-shadow: 0 16px 34px -14px rgba(90,50,70,0.28);
+    display:flex; padding: 16px; gap: 14px; overflow:hidden;
+  }
+  .cp-col{ display:flex; flex-direction:column; min-width:0; }
+  .cp-rank{ flex: 1.3; overflow-y:auto; }
+  .cp-turn{ flex:1; border-left: 2px dashed var(--line); padding-left:14px; }
+
+  .cp-title{ font-size:12px; font-weight:800; color:var(--accent-deep); letter-spacing:0.05em; margin-bottom:8px; text-transform:uppercase;}
+  .rank-row{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:12px; font-size:12.5px; margin-bottom:4px; border:1.5px solid transparent; }
+  .rank-row.active{ background:#FBE1E7; border-color:var(--accent); font-weight:800; }
+  .rank-num{ width:16px; font-weight:800; color:var(--ink-soft); font-size:11px; flex-shrink:0;}
+  .rank-dot{ width:13px; height:13px; border-radius:4px; flex-shrink:0; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .rank-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
+  .rank-left{ font-size:11px; color:var(--ink-soft); font-weight:800; flex-shrink:0;}
+  .rank-row.skip .rank-left::after{ content:" 💤"; }
+
+  .turn-banner{ background: linear-gradient(135deg, var(--accent), #C084D9); border-radius:16px; padding:12px; text-align:center; margin-bottom:12px; box-shadow: 0 8px 18px -10px rgba(201,100,126,0.5); }
+  .turn-banner div:first-child{ color: rgba(255,255,255,0.85) !important; }
+  .turn-banner .who{ font-size: 18px; font-weight:800; margin-top:2px; color:#fff; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .roll-btn{ padding:11px 16px; border-radius:13px; background:var(--accent); color:#fff; font-weight:800; width:100%; font-size:13.5px; box-shadow: 0 8px 16px -8px rgba(201,100,126,0.6); }
+  .manual-dice{ display:grid; grid-template-columns: repeat(3,1fr); gap:6px; }
+  .manual-dice button{ padding:9px 0; border-radius:10px; background:#F6EEEE; font-weight:800; font-size:14px; color:var(--ink); }
+
+  /* ---------- 모달 ---------- */
+  .modal-overlay{ position:fixed; inset:0; background:rgba(74,59,62,0.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
+  .modal-card{ width:min(440px,92vw); padding:28px 26px; text-align:center; border-radius:24px; }
+  .modal-zone-tag{ display:inline-block; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:800; color:#5c4650; margin-bottom:14px; }
+  .modal-msg{ font-size:17px; font-weight:700; line-height:1.55; margin: 10px 0 20px; }
+  .modal-btn-row{ display:flex; gap:10px; }
+  .modal-btn-row button{ flex:1; padding:13px 10px; border-radius:14px; font-weight:800; font-size:14.5px; }
+  .btn-success{ background:#8BBF87; color:#fff; }
+  .btn-fail{ background:#E8A0A0; color:#fff; }
+  .modal-close{ padding:13px 28px; border-radius:14px; background:var(--accent-deep); color:#fff; font-weight:800; font-size:15px; }
+
+  /* ---------- 승리 화면 ---------- */
+  .win-overlay{ background: rgba(60,40,60,0.55); overflow:hidden; }
+  #confetti-layer{ position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:1; }
+  .confetti-piece{ position:absolute; top:-24px; width:9px; height:15px; opacity:0.95; border-radius:2px; animation-name: confetti-fall; animation-timing-function: linear; animation-fill-mode: forwards; }
+  @keyframes confetti-fall{
+    0%{ transform: translateY(0) rotate(0deg); }
+    100%{ transform: translateY(112vh) rotate(560deg); }
+  }
+  .win-modal-card{
+    position:relative; z-index:2; padding: 40px 32px 32px;
+    background: linear-gradient(160deg, #FFF7E8, #FFEAF3 45%, #EFEAFF);
+    border: 2px solid #FFD9E6; box-shadow: 0 26px 60px -20px rgba(120,60,90,0.5);
+  }
+  .trophy-big{ font-size:74px; margin-bottom:4px; animation: trophy-bounce 1s ease infinite; }
+  @keyframes trophy-bounce{ 0%,100%{ transform: translateY(0) scale(1);} 50%{ transform: translateY(-12px) scale(1.08);} }
+  .win-title{
+    font-size:27px; margin-bottom:8px;
+    background: linear-gradient(90deg, var(--accent-deep), #7A82E0);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .final-rank-list{ margin: 18px 0 22px; display:flex; flex-direction:column; gap:7px; text-align:left; max-height:260px; overflow-y:auto; }
+  .final-rank-row{
+    display:flex; align-items:center; gap:10px; padding:9px 13px; border-radius:13px; background:#fff;
+    font-weight:700; font-size:14px; box-shadow:0 2px 7px rgba(0,0,0,0.09);
+  }
+  .final-rank-row.top1{ background: linear-gradient(90deg,#FFF3C4,#FFE0A3); box-shadow:0 4px 10px rgba(230,170,50,0.35); }
+  .final-rank-row .medal{ font-size:19px; width:24px; text-align:center; flex-shrink:0; }
+  .final-rank-row .frr-dot{ width:12px; height:12px; border-radius:4px; flex-shrink:0; }
+  .final-rank-row .frr-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .final-rank-row .frr-left{ font-size:11.5px; color:var(--ink-soft); font-weight:700; flex-shrink:0; }
+
+  .dice-modal-card{ padding: 40px 30px; }
+  .dice-roll-face{ font-size: 88px; line-height:1; margin-bottom: 18px; transition: transform .05s linear; }
+  .dice-roll-face.rolling{ animation: dice-shake 0.12s infinite; }
+  @keyframes dice-shake{ 0%{ transform: rotate(-8deg) scale(1);} 50%{ transform: rotate(8deg) scale(1.08);} 100%{ transform: rotate(-8deg) scale(1);} }
+  .dice-result-text{ font-size:26px; font-weight:800; color: var(--accent-deep); margin-bottom: 20px; animation: pop-in 0.3s ease; }
+
+  /* ---------- 토스트 ---------- */
+  #toast{
+    position:fixed; top:22px; left:50%; transform: translateX(-50%) translateY(-16px);
+    background: var(--ink); color:#fff; padding:13px 22px; border-radius:14px; font-size:14px; font-weight:700;
+    box-shadow: 0 12px 24px -10px rgba(0,0,0,0.4); opacity:0; transition: all .25s ease; z-index:60; max-width:80vw; text-align:center;
+  }
+  #toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ============ 셋업 화면 ============ -->
+<div id="setup-screen">
+  <div class="eyebrow">소요도서관 · 보드게임</div>
+  <h1 class="title-main">도서관 탐험대</h1>
+  <p class="subtitle">KDC 열 개의 구역을 한 바퀴! 조 이름을 짓고, 우리 반만의 탐험을 시작해보세요.</p>
+
+  <div class="card" id="setup-card">
+    <div class="field">
+      <label>조(팀) 개수 (2~10팀)</label>
+      <div class="stepper">
+        <button id="minus-btn" type="button">−</button>
+        <div class="count" id="team-count-display">4</div>
+        <button id="plus-btn" type="button">+</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>조 이름 짓기</label>
+      <div class="team-name-list" id="team-name-list"></div>
+    </div>
+
+    <div class="field">
+      <label>보드 칸 수</label>
+      <div class="toggle-row" id="size-toggle">
+        <div class="toggle-opt" data-size="30">아담하게<small>30칸</small></div>
+        <div class="toggle-opt active" data-size="40">기본<small>40칸</small></div>
+        <div class="toggle-opt" data-size="50">넉넉하게<small>50칸</small></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>주사위 방식</label>
+      <div class="toggle-row" id="dice-mode-toggle">
+        <div class="toggle-opt active" data-mode="manual">🎲 실물 주사위(숫자 직접 입력)</div>
+        <div class="toggle-opt" data-mode="screen">📱 화면에서 주사위 굴리기</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>도착 규칙</label>
+      <div class="toggle-row" id="arrival-toggle">
+        <div class="toggle-opt active" data-arrival="exact">정확히 맞춰야 도착<small>딱 떨어져야 결승</small></div>
+        <div class="toggle-opt" data-arrival="overshoot">지나쳐도 도착<small>넘으면 바로 도착 처리</small></div>
+      </div>
+    </div>
+
+    <button class="start-btn" id="start-btn">탐험 시작하기</button>
+  </div>
+</div>
+
+<!-- ============ 게임 화면 ============ -->
+<div class="hidden" id="game-screen">
+  <div class="game-top">
+    <div>
+      <div class="eyebrow">도서관 탐험대</div>
+      <h2>KDC 000 총류 → 900 역사, 한 바퀴 탐험!</h2>
+    </div>
+    <button class="reset-link" id="reset-btn">새 게임 시작</button>
+  </div>
+  <div id="board-outer">
+    <div id="board"></div>
+  </div>
+</div>
+
+<!-- ============ 미션 모달 ============ -->
+<div class="modal-overlay hidden" id="mission-modal">
+  <div class="card modal-card">
+    <div class="modal-zone-tag" id="modal-zone-tag">MISSION</div>
+    <div class="modal-msg" id="modal-msg"></div>
+    <div class="modal-btn-row">
+      <button class="btn-success" id="btn-mission-success">성공! 한 칸 전진</button>
+      <button class="btn-fail" id="btn-mission-fail">실패, 제자리</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 화면 주사위 모달 ============ -->
+<div class="modal-overlay hidden" id="dice-modal">
+  <div class="card modal-card dice-modal-card">
+    <div class="dice-roll-face" id="dice-roll-face">🎲</div>
+    <div class="dice-result-text hidden" id="dice-result-text"></div>
+    <button class="modal-close hidden" id="dice-confirm-btn">확인, 이동하기</button>
+  </div>
+</div>
+
+<!-- ============ 승리 모달 ============ -->
+<div class="modal-overlay hidden win-overlay" id="win-modal">
+  <div id="confetti-layer"></div>
+  <div class="card modal-card win-modal-card">
+    <div class="trophy-big">🏆</div>
+    <h2 class="win-title">탐험 완료!</h2>
+    <div class="modal-msg" id="win-msg"></div>
+    <div class="final-rank-list" id="final-rank-list"></div>
+    <button class="modal-close" id="win-close-btn">새 게임 시작</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- 기본 데이터 ---------------- */
+  var ZONES = [
+    { code:"000", name:"총류",     solid:"#A79FD9" },
+    { code:"100", name:"철학",     solid:"#C08AE0" },
+    { code:"200", name:"종교",     solid:"#F080B0" },
+    { code:"300", name:"사회과학", solid:"#F07272" },
+    { code:"400", name:"자연과학", solid:"#F5A94D" },
+    { code:"500", name:"기술과학", solid:"#F0CE3E" },
+    { code:"600", name:"예술",     solid:"#63C24F" },
+    { code:"700", name:"언어",     solid:"#2EC4A6" },
+    { code:"800", name:"문학",     solid:"#4DA8EA" },
+    { code:"900", name:"역사",     solid:"#7A82E0" }
+  ];
+
+  var BOARD_PRESETS = {
+    30: { cols:11, rows:6, cell:96, gap:7 },
+    40: { cols:14, rows:8, cell:76, gap:6 },
+    50: { cols:17, rows:10, cell:60, gap:5 }
+  };
+
+  var EVENT_TEMPLATES = [
+    { type:"forward", label:"전진 +1", text:"보물 지도를 발견했어요! 1칸 더 전진합니다." },
+    { type:"back",    label:"후퇴 -1", text:"책을 잘못 꽂아서 다시 정리해야 해요. 1칸 후퇴합니다." },
+    { type:"skip",    label:"한 턴 쉬기", text:"책 정리를 도와주느라 시간을 다 썼어요. 다음 턴을 쉽니다." },
+    { type:"none",    label:"휴식", text:"잠시 앉아서 책을 읽어요. 아무 일도 일어나지 않습니다." }
+  ];
+  var WARP_EVENT = { type:"warp", label:"상호대차 성공!", text:"책이 상호대차로 빠르게 도착했어요! 한 구역을 훌쩍 점프합니다." };
+
+  var TEAM_COLORS = ["#E88BA1","#8FB8DE","#9BCB8F","#E3B15C","#B29AE0","#E0876B","#6FC9C4","#D98FC7","#8C9BD6","#C9A15C"];
+  var EMOJI_CHOICES = ["","🐰","🐻","🦊","🐱","🐼","🐯","🦁","🐨","🐹","🐧","🐸","🦉","🐢","🦄","🐉"];
+
+  var STORAGE_KEY = "soyo_library_boardgame_v2";
+
+  /* ---------------- 경로/보드 생성 ---------------- */
+  function generatePath(cols, rows){
+    var path = [];
+    var c, r;
+    for(c=1; c<=cols; c++) path.push({col:c, row:1});
+    for(r=2; r<=rows; r++) path.push({col:cols, row:r});
+    for(c=cols-1; c>=1; c--) path.push({col:c, row:rows});
+    for(r=rows-1; r>=2; r--) path.push({col:1, row:r});
+    return path;
+  }
+
+  function buildTiles(boardSize){
+    var preset = BOARD_PRESETS[boardSize];
+    var path = generatePath(preset.cols, preset.rows);
+    var T = path.length;
+    var chunkSize = Math.round(T / ZONES.length);
+    var tiles = [];
+    for(var i=0;i<T;i++){
+      var zoneIdx = Math.min(Math.floor(i / chunkSize), ZONES.length - 1);
+      var posInChunk = i - zoneIdx * chunkSize;
+      var type = "normal";
+      var eventData = null;
+
+      if(i === 0){ type = "start"; }
+      else if(i === T-1){ type = "finish"; }
+      else if(posInChunk === 0){ type = "normal"; } /* 구역 첫 칸 = 이름표 */
+      else {
+        /* 구역 칸 수에 비례해서 미션/이벤트가 번갈아 배정됨 (칸이 늘어나면 특수칸도 함께 늘어남) */
+        var isMissionSlot = (posInChunk % 2 === 1);
+        if(isMissionSlot){
+          type = "mission";
+        } else {
+          var useWarp = (zoneIdx % 3 === 2);
+          if(useWarp){ type = "warp"; eventData = WARP_EVENT; }
+          else { type = "event"; eventData = EVENT_TEMPLATES[zoneIdx % EVENT_TEMPLATES.length]; }
+        }
+      }
+
+      var isCorner = (path[i].col===1 && path[i].row===1) || (path[i].col===preset.cols && path[i].row===1) ||
+                      (path[i].col===preset.cols && path[i].row===preset.rows) || (path[i].col===1 && path[i].row===preset.rows);
+
+      tiles.push({
+        index:i, col:path[i].col, row:path[i].row, zoneIdx:zoneIdx, zone:ZONES[zoneIdx],
+        type:type, event:eventData, showLabel:(posInChunk===0 || type==="start" || type==="finish"), corner:isCorner
+      });
+    }
+    return { tiles: tiles, preset: preset, total: T, chunkSize: chunkSize };
+  }
+
+  /* ---------------- 상태 ---------------- */
+  var state = null;
+  var BOARD = null; // 현재 게임의 buildTiles() 결과
+
+  function defaultState(){
+    return {
+      phase: "setup", boardSize: 40, diceMode: "manual",
+      exactArrival: true, teams: [], currentTurn: 0, winnerIndex: null
+    };
+  }
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return null;
+      var parsed = JSON.parse(raw);
+      if(!parsed || !parsed.teams || !parsed.teams.length) return null;
+      return parsed;
+    }catch(e){ return null; }
+  }
+  function saveState(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
+
+  /* ---------------- 셋업 화면 로직 ---------------- */
+  var setupScreen = document.getElementById("setup-screen");
+  var gameScreen = document.getElementById("game-screen");
+  var teamCountDisplay = document.getElementById("team-count-display");
+  var teamNameList = document.getElementById("team-name-list");
+  var minusBtn = document.getElementById("minus-btn");
+  var plusBtn = document.getElementById("plus-btn");
+  var sizeToggle = document.getElementById("size-toggle");
+  var diceModeToggle = document.getElementById("dice-mode-toggle");
+  var arrivalToggle = document.getElementById("arrival-toggle");
+  var startBtn = document.getElementById("start-btn");
+
+  var setupTeamCount = 4;
+  var setupTeamNames = [];
+  var setupTeamEmojis = [];
+  var setupBoardSize = 40;
+  var setupDiceMode = "manual";
+  var setupArrival = "exact";
+  var openEmojiPickerIndex = null;
+
+  function renderTeamNameList(){
+    teamNameList.innerHTML = "";
+    for(var i=0;i<setupTeamCount;i++){
+      (function(idx){
+        var row = document.createElement("div");
+        row.className = "team-name-row";
+        var dot = document.createElement("div");
+        dot.className = "team-dot";
+        dot.style.background = TEAM_COLORS[idx % TEAM_COLORS.length];
+        row.appendChild(dot);
+        var input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 10;
+        input.placeholder = (idx+1) + "조 이름 (예: 청개구리조)";
+        input.value = setupTeamNames[idx] || "";
+        input.addEventListener("input", function(){ setupTeamNames[idx] = input.value; });
+        row.appendChild(input);
+
+        var emojiBtn = document.createElement("button");
+        emojiBtn.type = "button";
+        emojiBtn.className = "emoji-pick-btn" + (setupTeamEmojis[idx] ? " picked" : "");
+        emojiBtn.textContent = setupTeamEmojis[idx] || "＋";
+        emojiBtn.title = "눌러서 말 이모지 선택 (선택 안 해도 돼요)";
+        emojiBtn.addEventListener("click", function(e){
+          e.stopPropagation();
+          openEmojiPickerIndex = (openEmojiPickerIndex === idx) ? null : idx;
+          renderTeamNameList();
+        });
+        row.appendChild(emojiBtn);
+
+        if(openEmojiPickerIndex === idx){
+          var pop = document.createElement("div");
+          pop.className = "emoji-popover";
+          pop.addEventListener("click", function(e){ e.stopPropagation(); });
+
+          var noneBtn = document.createElement("button");
+          noneBtn.type = "button";
+          noneBtn.className = "none-opt";
+          noneBtn.textContent = "이모지 선택 안 함 (이름 첫 글자로 표시)";
+          noneBtn.addEventListener("click", function(){
+            setupTeamEmojis[idx] = "";
+            openEmojiPickerIndex = null;
+            renderTeamNameList();
+          });
+          pop.appendChild(noneBtn);
+
+          var grid = document.createElement("div");
+          grid.className = "emoji-grid";
+          EMOJI_CHOICES.forEach(function(em){
+            if(!em) return;
+            var b = document.createElement("button");
+            b.type = "button";
+            b.textContent = em;
+            b.addEventListener("click", function(){
+              setupTeamEmojis[idx] = em;
+              openEmojiPickerIndex = null;
+              renderTeamNameList();
+            });
+            grid.appendChild(b);
+          });
+          pop.appendChild(grid);
+          row.appendChild(pop);
+        }
+
+        teamNameList.appendChild(row);
+      })(i);
+    }
+  }
+  renderTeamNameList();
+  document.addEventListener("click", function(){
+    if(openEmojiPickerIndex !== null){ openEmojiPickerIndex = null; renderTeamNameList(); }
+  });
+
+  minusBtn.addEventListener("click", function(){
+    if(setupTeamCount > 2){ setupTeamCount--; teamCountDisplay.textContent = setupTeamCount; renderTeamNameList(); }
+  });
+  plusBtn.addEventListener("click", function(){
+    if(setupTeamCount < 10){ setupTeamCount++; teamCountDisplay.textContent = setupTeamCount; renderTeamNameList(); }
+  });
+
+  function wireToggleGroup(container, dataAttr, onPick){
+    var opts = container.querySelectorAll(".toggle-opt");
+    opts.forEach(function(opt){
+      opt.addEventListener("click", function(){
+        opts.forEach(function(o){ o.classList.remove("active"); });
+        opt.classList.add("active");
+        onPick(opt.getAttribute(dataAttr));
+      });
+    });
+  }
+  wireToggleGroup(sizeToggle, "data-size", function(v){ setupBoardSize = parseInt(v,10); });
+  wireToggleGroup(diceModeToggle, "data-mode", function(v){ setupDiceMode = v; });
+  wireToggleGroup(arrivalToggle, "data-arrival", function(v){ setupArrival = v; });
+
+  startBtn.addEventListener("click", function(){
+    var teams = [];
+    for(var i=0;i<setupTeamCount;i++){
+      var nm = (setupTeamNames[i] || "").trim();
+      if(!nm) nm = (i+1) + "조";
+      teams.push({ name: nm, emoji: setupTeamEmojis[i] || "", color: TEAM_COLORS[i % TEAM_COLORS.length], pos:0, skipNext:false });
+    }
+    state = defaultState();
+    state.phase = "playing";
+    state.boardSize = setupBoardSize;
+    state.diceMode = setupDiceMode;
+    state.exactArrival = (setupArrival === "exact");
+    state.teams = teams;
+    state.currentTurn = 0;
+    state.winnerIndex = null;
+    saveState();
+    showGameScreen();
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", function(){
+    if(confirm("현재 게임을 초기화하고 새로 시작할까요?")){
+      localStorage.removeItem(STORAGE_KEY);
+      state = null;
+      gameScreen.classList.add("hidden");
+      setupScreen.classList.remove("hidden");
+    }
+  });
+  document.getElementById("win-close-btn").addEventListener("click", function(){
+    document.getElementById("win-modal").classList.add("hidden");
+    localStorage.removeItem(STORAGE_KEY);
+    state = null;
+    gameScreen.classList.add("hidden");
+    setupScreen.classList.remove("hidden");
+  });
+
+  /* ---------------- 게임 화면 ---------------- */
+  var boardEl = document.getElementById("board");
+  var missionModal = document.getElementById("mission-modal");
+  var modalZoneTag = document.getElementById("modal-zone-tag");
+  var modalMsg = document.getElementById("modal-msg");
+  var btnSuccess = document.getElementById("btn-mission-success");
+  var btnFail = document.getElementById("btn-mission-fail");
+  var winModal = document.getElementById("win-modal");
+  var winMsg = document.getElementById("win-msg");
+  var toastEl = document.getElementById("toast");
+
+  var pendingMissionCtx = null;
+  var toastTimer = null;
+  var actionLocked = false; // 이동 애니메이션/토스트 진행 중 중복 클릭 방지
+
+  function showToast(msg, duration, cb){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){
+      toastEl.classList.remove("show");
+      if(cb) cb();
+    }, duration || 1600);
+  }
+
+  function showGameScreen(){
+    setupScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    BOARD = buildTiles(state.boardSize);
+    renderBoardStatic();
+    renderAll();
+  }
+
+  function renderBoardStatic(){
+    var preset = BOARD.preset;
+    boardEl.innerHTML = "";
+    boardEl.style.gridTemplateColumns = "repeat(" + preset.cols + ", " + preset.cell + "px)";
+    boardEl.style.gridTemplateRows = "repeat(" + preset.rows + ", " + preset.cell + "px)";
+    boardEl.style.gap = preset.gap + "px";
+
+    BOARD.tiles.forEach(function(tile){
+      var div = document.createElement("div");
+      div.className = "tile " + tile.type + (tile.corner ? " corner" : "");
+      div.style.gridColumn = tile.col;
+      div.style.gridRow = tile.row;
+      div.style.background = tile.zone.solid;
+      div.id = "tile-" + tile.index;
+
+      if(tile.type === "mission" || tile.type === "event" || tile.type === "warp"){
+        var mark = document.createElement("div");
+        mark.className = "tile-mark";
+        div.appendChild(mark);
+      }
+
+      var tag = document.createElement("div");
+      tag.className = "tile-tag";
+      tag.textContent = (tile.index+1);
+      div.appendChild(tag);
+
+      if(tile.showLabel){
+        var label = document.createElement("div");
+        label.className = "tile-label";
+        if(tile.type === "start") label.textContent = "출발\n" + tile.zone.code;
+        else if(tile.type === "finish") label.textContent = "결승\n900";
+        else label.textContent = tile.zone.code + "\n" + tile.zone.name;
+        label.style.whiteSpace = "pre-line";
+        div.appendChild(label);
+      }
+
+      var tokWrap = document.createElement("div");
+      tokWrap.className = "tile-tokens";
+      tokWrap.id = "tokens-" + tile.index;
+      div.appendChild(tokWrap);
+
+      boardEl.appendChild(div);
+    });
+
+    // 중앙 패널 삽입 (내부 빈 영역을 정확히 채움)
+    var center = document.createElement("div");
+    center.id = "center-panel";
+    center.style.gridColumn = "2 / " + preset.cols;
+    center.style.gridRow = "2 / " + preset.rows;
+    center.innerHTML =
+      '<div class="cp-col cp-rank"><div class="cp-title">조별 현황 (결승까지 남은 칸 순)</div><div id="rank-list"></div></div>' +
+      '<div class="cp-col cp-turn">' +
+        '<div class="turn-banner"><div style="font-size:11.5px; font-weight:700;">지금 차례</div><div class="who" id="turn-name">-</div></div>' +
+        (state.diceMode === "screen"
+          ? '<button class="roll-btn" id="roll-btn">🎲 주사위 굴리기</button>'
+          : '<label style="font-size:12.5px; font-weight:700; display:block; margin-bottom:8px;">주사위에서 나온 숫자를 눌러주세요</label><div class="manual-dice" id="manual-dice"></div>') +
+      '</div>';
+    boardEl.appendChild(center);
+
+    if(state.diceMode === "screen"){
+      document.getElementById("roll-btn").addEventListener("click", openDiceModal);
+    } else {
+      buildManualDice();
+    }
+  }
+
+  var DICE_FACES = ["⚀","⚁","⚂","⚃","⚄","⚅"];
+  var diceModal = document.getElementById("dice-modal");
+  var diceRollFace = document.getElementById("dice-roll-face");
+  var diceResultText = document.getElementById("dice-result-text");
+  var diceConfirmBtn = document.getElementById("dice-confirm-btn");
+  var pendingDiceValue = null;
+
+  function openDiceModal(){
+    if(state.winnerIndex !== null || actionLocked) return;
+    diceResultText.classList.add("hidden");
+    diceConfirmBtn.classList.add("hidden");
+    diceRollFace.classList.add("rolling");
+    diceRollFace.textContent = DICE_FACES[Math.floor(Math.random()*6)];
+    diceModal.classList.remove("hidden");
+
+    var ticks = 0;
+    var interval = setInterval(function(){
+      diceRollFace.textContent = DICE_FACES[Math.floor(Math.random()*6)];
+      ticks++;
+      if(ticks > 12){
+        clearInterval(interval);
+        var finalRoll = Math.floor(Math.random()*6)+1;
+        pendingDiceValue = finalRoll;
+        diceRollFace.classList.remove("rolling");
+        diceRollFace.textContent = DICE_FACES[finalRoll-1];
+        diceResultText.textContent = finalRoll + "칸 이동!";
+        diceResultText.classList.remove("hidden");
+        diceConfirmBtn.classList.remove("hidden");
+      }
+    }, 90);
+  }
+
+  diceConfirmBtn.addEventListener("click", function(){
+    diceModal.classList.add("hidden");
+    var val = pendingDiceValue;
+    pendingDiceValue = null;
+    if(val) handleMove(val);
+  });
+
+  function buildManualDice(){
+    var wrap = document.getElementById("manual-dice");
+    if(!wrap) return;
+    wrap.innerHTML = "";
+    for(var n=1;n<=6;n++){
+      (function(num){
+        var b = document.createElement("button");
+        b.type = "button"; b.textContent = num;
+        b.addEventListener("click", function(){ handleMove(num); });
+        wrap.appendChild(b);
+      })(n);
+    }
+  }
+
+  function renderTokens(){
+    BOARD.tiles.forEach(function(t){
+      var w = document.getElementById("tokens-" + t.index);
+      if(w) w.innerHTML = "";
+    });
+    var byPos = {};
+    state.teams.forEach(function(team, idx){
+      if(!byPos[team.pos]) byPos[team.pos] = [];
+      byPos[team.pos].push(idx);
+    });
+    Object.keys(byPos).forEach(function(posKey){
+      var idxs = byPos[posKey];
+      var w = document.getElementById("tokens-" + posKey);
+      if(!w) return;
+      var count = idxs.length;
+      var sizeClass = count >= 4 ? "chip-xs" : (count === 3 ? "chip-sm" : (count === 2 ? "chip-md" : ""));
+      idxs.forEach(function(idx){
+        var team = state.teams[idx];
+        var chip = document.createElement("div");
+        chip.className = "chip" + (sizeClass ? " " + sizeClass : "") + (idx === state.currentTurn && state.winnerIndex===null ? " current-turn" : "");
+        chip.style.background = team.color;
+        chip.textContent = team.emoji ? team.emoji : team.name.charAt(0);
+        chip.title = team.name;
+        w.appendChild(chip);
+      });
+    });
+  }
+
+  function renderRankList(){
+    var list = document.getElementById("rank-list");
+    if(!list) return;
+    var lastIdx = BOARD.total - 1;
+    var sorted = state.teams.map(function(t, idx){ return { t:t, idx:idx, left: lastIdx - t.pos }; });
+    sorted.sort(function(a,b){ return a.left - b.left; });
+    list.innerHTML = "";
+    sorted.forEach(function(entry, rank){
+      var row = document.createElement("div");
+      row.className = "rank-row" + (entry.idx === state.currentTurn ? " active" : "") + (entry.t.skipNext ? " skip" : "");
+      var dot = document.createElement("div");
+      dot.className = "rank-dot"; dot.style.background = entry.t.color;
+      var num = document.createElement("div");
+      num.className = "rank-num"; num.textContent = (rank+1);
+      var name = document.createElement("div");
+      name.className = "rank-name"; name.textContent = (entry.t.emoji ? entry.t.emoji + " " : "") + entry.t.name;
+      var left = document.createElement("div");
+      left.className = "rank-left"; left.textContent = entry.left === 0 ? "도착!" : ("도착까지 " + entry.left + "칸");
+      row.appendChild(num); row.appendChild(dot); row.appendChild(name); row.appendChild(left);
+      list.appendChild(row);
+    });
+  }
+
+  function renderTurnBanner(){
+    var nameEl = document.getElementById("turn-name");
+    if(!nameEl) return;
+    var team = state.teams[state.currentTurn];
+    nameEl.textContent = (team.emoji ? team.emoji + " " : "") + team.name;
+  }
+
+  function renderAll(){
+    renderTokens();
+    renderRankList();
+    renderTurnBanner();
+  }
+
+  /* ---------------- 주사위 & 이동 ---------------- */
+  function handleMove(steps){
+    if(state.winnerIndex !== null || actionLocked) return;
+    actionLocked = true;
+    var pIdx = state.currentTurn;
+    var team = state.teams[pIdx];
+    if(team.skipNext){
+      team.skipNext = false;
+      saveState(); renderAll();
+      showToast(team.name + "은(는) 이번 턴을 쉽니다. 💤", 1400, advanceTurn);
+      return;
+    }
+    var lastIdx = BOARD.total - 1;
+    var target = team.pos + steps;
+
+    if(target > lastIdx){
+      if(state.exactArrival){
+        showToast("정확한 숫자가 필요해요! " + team.name + "은(는) 제자리에서 대기합니다.", 1700, advanceTurn);
+        return;
+      } else {
+        target = lastIdx;
+      }
+    }
+    animateWalk(pIdx, team.pos, target, function(){
+      saveState();
+      resolveTile(pIdx, BOARD.tiles[target]);
+    });
+  }
+
+  function animateWalk(pIdx, fromPos, toPos, cb){
+    var team = state.teams[pIdx];
+    var cur = fromPos;
+    function step(){
+      if(cur >= toPos){ team.pos = toPos; renderTokens(); renderRankList(); cb(); return; }
+      cur++;
+      team.pos = cur;
+      renderTokens();
+      renderRankList();
+      setTimeout(step, 260);
+    }
+    step();
+  }
+
+  function resolveTile(pIdx, tile){
+    var team = state.teams[pIdx];
+
+    if(tile.type === "finish"){ declareWinner(pIdx); return; }
+
+    if(tile.type === "mission"){
+      openMissionModal(tile.zone, pIdx, tile);
+      return;
+    }
+
+    if((tile.type === "event" || tile.type === "warp") && tile.event){
+      var ev = tile.event;
+      var lastIdx = BOARD.total - 1;
+      if(ev.type === "forward"){ team.pos = Math.min(team.pos + 1, lastIdx); }
+      else if(ev.type === "back"){ team.pos = Math.max(team.pos - 1, 0); }
+      else if(ev.type === "skip"){ team.skipNext = true; }
+      else if(ev.type === "warp"){ team.pos = Math.min(team.pos + BOARD.chunkSize, lastIdx); }
+      renderTokens(); renderRankList(); saveState();
+      var tag = (ev.type === "warp" ? "🌀 " : "◆ ") + ev.label;
+      showToast(tag + " · " + ev.text, 1900, function(){
+        if(state.teams[pIdx].pos === lastIdx){ declareWinner(pIdx); } else { advanceTurn(); }
+      });
+      return;
+    }
+
+    advanceTurn();
+  }
+
+  function openMissionModal(zone, pIdx, tile){
+    modalZoneTag.textContent = "✦ 미션 · " + zone.code + " " + zone.name;
+    modalZoneTag.style.background = zone.solid;
+    modalMsg.textContent = "미션 성공했나요?";
+    missionModal.classList.remove("hidden");
+    pendingMissionCtx = { pIdx: pIdx, tile: tile };
+  }
+  btnSuccess.addEventListener("click", function(){ resolveMissionResult(true); });
+  btnFail.addEventListener("click", function(){ resolveMissionResult(false); });
+
+  function resolveMissionResult(success){
+    missionModal.classList.add("hidden");
+    if(!pendingMissionCtx) return;
+    var pIdx = pendingMissionCtx.pIdx;
+    var team = state.teams[pIdx];
+    var lastIdx = BOARD.total - 1;
+    pendingMissionCtx = null;
+    if(success){
+      team.pos = Math.min(team.pos + 1, lastIdx);
+      renderTokens(); renderRankList(); saveState();
+      if(team.pos === lastIdx){ declareWinner(pIdx); return; }
+    }
+    advanceTurn();
+  }
+
+  function advanceTurn(){
+    actionLocked = false;
+    state.currentTurn = (state.currentTurn + 1) % state.teams.length;
+    saveState();
+    renderAll();
+  }
+
+  function spawnConfetti(){
+    var layer = document.getElementById("confetti-layer");
+    if(!layer) return;
+    layer.innerHTML = "";
+    var colors = TEAM_COLORS.concat(["#FFD966","#FF8FA3","#8FE3C0","#FFFFFF"]);
+    for(var i=0;i<70;i++){
+      var piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      piece.style.left = (Math.random()*100) + "%";
+      piece.style.background = colors[Math.floor(Math.random()*colors.length)];
+      piece.style.animationDuration = (2 + Math.random()*2) + "s";
+      piece.style.animationDelay = (Math.random()*0.7) + "s";
+      if(Math.random() > 0.5) piece.style.borderRadius = "50%";
+      layer.appendChild(piece);
+    }
+  }
+
+  function renderFinalRanking(){
+    var list = document.getElementById("final-rank-list");
+    if(!list) return;
+    list.innerHTML = "";
+    var lastIdx = BOARD.total - 1;
+    var medals = ["🥇","🥈","🥉"];
+    var sorted = state.teams.map(function(t, idx){ return { t:t, idx:idx, left: lastIdx - t.pos }; });
+    sorted.sort(function(a,b){ return a.left - b.left; });
+    sorted.forEach(function(entry, rank){
+      var row = document.createElement("div");
+      row.className = "final-rank-row" + (rank === 0 ? " top1" : "");
+
+      var medal = document.createElement("span");
+      medal.className = "medal";
+      medal.textContent = medals[rank] || ((rank+1) + "위");
+      row.appendChild(medal);
+
+      var dot = document.createElement("span");
+      dot.className = "frr-dot";
+      dot.style.background = entry.t.color;
+      row.appendChild(dot);
+
+      var name = document.createElement("span");
+      name.className = "frr-name";
+      name.textContent = (entry.t.emoji ? entry.t.emoji + " " : "") + entry.t.name;
+      row.appendChild(name);
+
+      var left = document.createElement("span");
+      left.className = "frr-left";
+      left.textContent = entry.left === 0 ? "도착!" : ("도착까지 " + entry.left + "칸");
+      row.appendChild(left);
+
+      list.appendChild(row);
+    });
+  }
+
+  function declareWinner(pIdx){
+    actionLocked = false;
+    state.winnerIndex = pIdx;
+    saveState();
+    renderAll();
+    var team = state.teams[pIdx];
+    winMsg.textContent = (team.emoji ? team.emoji + " " : "") + team.name + "이(가) 가장 먼저 900 역사 구역, 결승선에 도착했어요! 모두 함께 축하해주세요. 👏";
+    renderFinalRanking();
+    spawnConfetti();
+    winModal.classList.remove("hidden");
+  }
+
+  /* ---------------- 초기 로드 ---------------- */
+  var loaded = loadState();
+  if(loaded && loaded.phase === "playing"){
+    state = loaded;
+    showGameScreen();
+    if(state.winnerIndex !== null){
+      var team = state.teams[state.winnerIndex];
+      winMsg.textContent = (team.emoji ? team.emoji + " " : "") + team.name + "이(가) 가장 먼저 결승선에 도착했어요! 모두 함께 축하해주세요. 👏";
+      renderFinalRanking();
+      spawnConfetti();
+      winModal.classList.remove("hidden");
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

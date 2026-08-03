@@ -286,6 +286,15 @@
   </div>
 </div>
 
+<!-- ============ 이벤트 모달 ============ -->
+<div class="modal-overlay hidden" id="event-modal">
+  <div class="card modal-card">
+    <div class="modal-zone-tag" id="event-modal-tag">EVENT</div>
+    <div class="modal-msg" id="event-modal-msg"></div>
+    <button class="modal-close" id="event-modal-close-btn">확인</button>
+  </div>
+</div>
+
 <!-- ============ 화면 주사위 모달 ============ -->
 <div class="modal-overlay hidden" id="dice-modal">
   <div class="card modal-card dice-modal-card">
@@ -575,6 +584,25 @@
   var winModal = document.getElementById("win-modal");
   var winMsg = document.getElementById("win-msg");
   var toastEl = document.getElementById("toast");
+  var eventModal = document.getElementById("event-modal");
+  var eventModalTag = document.getElementById("event-modal-tag");
+  var eventModalMsg = document.getElementById("event-modal-msg");
+  var eventModalCloseBtn = document.getElementById("event-modal-close-btn");
+  var pendingEventConfirm = null;
+
+  function openEventModal(bgColor, tagText, msgText, onConfirm){
+    eventModalTag.textContent = tagText;
+    eventModalTag.style.background = bgColor;
+    eventModalMsg.textContent = msgText;
+    eventModal.classList.remove("hidden");
+    pendingEventConfirm = onConfirm;
+  }
+  eventModalCloseBtn.addEventListener("click", function(){
+    eventModal.classList.add("hidden");
+    var cb = pendingEventConfirm;
+    pendingEventConfirm = null;
+    if(cb) cb();
+  });
 
   var pendingMissionCtx = null;
   var toastTimer = null;
@@ -595,6 +623,7 @@
     gameScreen.classList.remove("hidden");
     BOARD = buildTiles(state.boardSize);
     renderBoardStatic();
+    initTeamChips();
     renderAll();
   }
 
@@ -717,11 +746,26 @@
     }
   }
 
-  function renderTokens(){
-    BOARD.tiles.forEach(function(t){
-      var w = document.getElementById("tokens-" + t.index);
-      if(w) w.innerHTML = "";
+  var teamChipEls = [];
+
+  function initTeamChips(){
+    teamChipEls = state.teams.map(function(team, idx){
+      var chip = document.createElement("div");
+      chip.className = "chip";
+      chip.style.background = team.color;
+      chip.textContent = team.emoji ? team.emoji : team.name.charAt(0);
+      chip.title = team.name;
+      return chip;
     });
+    state.teams.forEach(function(team, idx){
+      var w = document.getElementById("tokens-" + team.pos);
+      if(w) w.appendChild(teamChipEls[idx]);
+    });
+    updateChipSizes();
+    updateCurrentTurnHighlight();
+  }
+
+  function updateChipSizes(){
     var byPos = {};
     state.teams.forEach(function(team, idx){
       if(!byPos[team.pos]) byPos[team.pos] = [];
@@ -729,20 +773,29 @@
     });
     Object.keys(byPos).forEach(function(posKey){
       var idxs = byPos[posKey];
-      var w = document.getElementById("tokens-" + posKey);
-      if(!w) return;
       var count = idxs.length;
       var sizeClass = count >= 4 ? "chip-xs" : (count === 3 ? "chip-sm" : (count === 2 ? "chip-md" : ""));
       idxs.forEach(function(idx){
-        var team = state.teams[idx];
-        var chip = document.createElement("div");
-        chip.className = "chip" + (sizeClass ? " " + sizeClass : "") + (idx === state.currentTurn && state.winnerIndex===null ? " current-turn" : "");
-        chip.style.background = team.color;
-        chip.textContent = team.emoji ? team.emoji : team.name.charAt(0);
-        chip.title = team.name;
-        w.appendChild(chip);
+        var chip = teamChipEls[idx];
+        if(!chip) return;
+        chip.classList.remove("chip-md", "chip-sm", "chip-xs");
+        if(sizeClass) chip.classList.add(sizeClass);
       });
     });
+  }
+
+  function updateCurrentTurnHighlight(){
+    teamChipEls.forEach(function(chip, idx){
+      if(!chip) return;
+      chip.classList.toggle("current-turn", idx === state.currentTurn && state.winnerIndex === null);
+    });
+  }
+
+  // 해당 팀의 말만 새 칸으로 옮김 (다른 팀 말은 전혀 건드리지 않아 애니메이션이 튀지 않음)
+  function moveChipTo(idx, newPos){
+    var container = document.getElementById("tokens-" + newPos);
+    if(container && teamChipEls[idx]) container.appendChild(teamChipEls[idx]);
+    updateChipSizes();
   }
 
   function renderRankList(){
@@ -776,7 +829,7 @@
   }
 
   function renderAll(){
-    renderTokens();
+    updateCurrentTurnHighlight();
     renderRankList();
     renderTurnBanner();
   }
@@ -790,7 +843,7 @@
     if(team.skipNext){
       team.skipNext = false;
       saveState(); renderAll();
-      showToast(team.name + "은(는) 이번 턴을 쉽니다. 💤", 1400, advanceTurn);
+      openEventModal(team.color, "💤 쉬는 턴", team.name + "은(는) 지난 이벤트 때문에 이번 턴을 쉽니다.", advanceTurn);
       return;
     }
     var lastIdx = BOARD.total - 1;
@@ -814,10 +867,10 @@
     var team = state.teams[pIdx];
     var cur = fromPos;
     function step(){
-      if(cur >= toPos){ team.pos = toPos; renderTokens(); renderRankList(); cb(); return; }
+      if(cur >= toPos){ team.pos = toPos; moveChipTo(pIdx, toPos); renderRankList(); cb(); return; }
       cur++;
       team.pos = cur;
-      renderTokens();
+      moveChipTo(pIdx, cur);
       renderRankList();
       setTimeout(step, 260);
     }
@@ -837,13 +890,13 @@
     if((tile.type === "event" || tile.type === "warp") && tile.event){
       var ev = tile.event;
       var lastIdx = BOARD.total - 1;
-      if(ev.type === "forward"){ team.pos = Math.min(team.pos + 1, lastIdx); }
-      else if(ev.type === "back"){ team.pos = Math.max(team.pos - 1, 0); }
+      if(ev.type === "forward"){ team.pos = Math.min(team.pos + 1, lastIdx); moveChipTo(pIdx, team.pos); }
+      else if(ev.type === "back"){ team.pos = Math.max(team.pos - 1, 0); moveChipTo(pIdx, team.pos); }
       else if(ev.type === "skip"){ team.skipNext = true; }
-      else if(ev.type === "warp"){ team.pos = Math.min(team.pos + BOARD.chunkSize, lastIdx); }
-      renderTokens(); renderRankList(); saveState();
+      else if(ev.type === "warp"){ team.pos = Math.min(team.pos + BOARD.chunkSize, lastIdx); moveChipTo(pIdx, team.pos); }
+      renderRankList(); saveState();
       var tag = (ev.type === "warp" ? "🌀 " : "◆ ") + ev.label;
-      showToast(tag + " · " + ev.text, 1900, function(){
+      openEventModal(tile.zone.solid, tag, ev.text, function(){
         if(state.teams[pIdx].pos === lastIdx){ declareWinner(pIdx); } else { advanceTurn(); }
       });
       return;
@@ -871,7 +924,7 @@
     pendingMissionCtx = null;
     if(success){
       team.pos = Math.min(team.pos + 1, lastIdx);
-      renderTokens(); renderRankList(); saveState();
+      moveChipTo(pIdx, team.pos); renderRankList(); saveState();
       if(team.pos === lastIdx){ declareWinner(pIdx); return; }
     }
     advanceTurn();
